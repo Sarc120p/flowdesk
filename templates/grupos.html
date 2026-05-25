@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>FlowDesk – Grupos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .grupo-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.2s;
+        }
+        .grupo-item:hover { background: rgba(78, 205, 196, 0.15); }
+        .btn-novo-grupo {
+            background: var(--accent-primary);
+            color: #000;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+<main class="container p-4">
+    <h1 class="titulo">FlowDesk</h1>
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4>Os teus grupos</h4>
+            <button id="btnNovoGrupo" class="btn-novo-grupo">+ Novo grupo</button>
+        </div>
+        <div class="card-body" id="listaGrupos">
+            {% for g in grupos %}
+                <div class="grupo-item" style="display: flex; justify-content: space-between; align-items: center;">
+                    <a href="/grupo/{{ g.slug }}" style="display: flex; justify-content: space-between; align-items: center; flex: 1; text-decoration: none; color: inherit;">
+                        <span>📁 {{ g.nome }} <small class="text-muted">({{ g.slug }})</small></span>
+                        <span>🔒 {{ 'Sim' if g.codigo else 'Não' }}</span>
+                    </a>
+                    <button class="btn-eliminar-grupo" data-slug="{{ g.slug }}" data-nome="{{ g.nome }}" style="background: none; border: none; cursor: pointer; margin-left: 1rem; opacity: 0.6; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">🗑️</button>
+                </div>
+            {% else %}
+                <p class="sem-resultados">Nenhum grupo criado ainda. Clique em "Novo grupo" para começar.</p>
+            {% endfor %}
+        </div>
+    </div>
+</main>
+
+<!-- Modal criar grupo -->
+<div id="modalGrupo" class="modal-overlay" style="display:none;">
+    <div class="modal-container">
+        <div class="modal-header-custom">
+            <h3 class="modal-title">Criar novo grupo</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div class="form-group">
+                <label>Nome do grupo</label>
+                <input type="text" id="nomeGrupo" class="form-control" placeholder="Ex: Infraestrutura">
+            </div>
+            <div class="form-group">
+                <label>Slug (identificador único, sem espaços)</label>
+                <input type="text" id="slugGrupo" class="form-control" placeholder="Ex: infra">
+            </div>
+            <div class="form-group">
+                <label>Código de acesso (opcional)</label>
+                <input type="text" id="codigoGrupo" class="form-control" placeholder="Deixe vazio para acesso livre">
+            </div>
+            <hr>
+            <p class="text-muted"><strong>Administrador do grupo (opcional)</strong></p>
+            <div class="form-group">
+                <label>Nome do administrador</label>
+                <input type="text" id="adminNomeGrupo" class="form-control" placeholder="Nome do gerente">
+            </div>
+            <div class="form-group">
+                <label>Senha do administrador</label>
+                <input type="password" id="adminSenhaGrupo" class="form-control" placeholder="Senha para gerir membros">
+            </div>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="cancelGrupo" class="btn-cancelar">Cancelar</button>
+            <button id="saveGrupo" class="btn-eliminar-custom">Criar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de eliminação de grupo -->
+<div id="modalEliminarGrupo" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 400px;">
+        <div class="modal-header-custom">
+            <div class="modal-icon">
+                <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1z"/>
+                </svg>
+            </div>
+            <h3 class="modal-title">Eliminar Grupo</h3>
+        </div>
+        <div class="modal-body-custom">
+            <p>Tem a certeza que deseja eliminar o grupo <strong id="nomeGrupoEliminar"></strong>?</p>
+            <p class="text-muted">Todos os chamados e categorias dentro dele serão perdidos.</p>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="cancelEliminarGrupo" class="btn-cancelar">Cancelar</button>
+            <button id="confirmEliminarGrupo" class="btn-eliminar-custom">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/grupos.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="grupo-slug" content="{{ grupo.slug }}">
+    <title>FlowDesk – {{ grupo.nome }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<main class="container p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="titulo mb-0">{{ grupo.nome }}</h1>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span id="nomeMembroLogado" style="color: var(--accent-primary); font-size: 0.9rem; margin-right: 0.5rem;"></span>
+            <button id="btnLogout" class="btn-pesquisar" style="display: none;" title="Sair da conta">🚪 Sair</button>
+            <button id="btnAdmin" class="btn-pesquisar" style="display: none;" title="Administração do grupo">⚙️ Administração</button>
+            <a href="/" class="btn-cancelar" style="text-decoration:none;">← Sair do grupo</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- COLUNA ESQUERDA: Formulário -->
+        <div class="col-left">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Adicionar Novo Chamado</h4>
+                </div>
+                <div class="card-body">
+                    <form id="formAdicionarTarefa">
+                        <input type="hidden" id="grupoSlug" value="{{ grupo.slug }}">
+                        <div class="form-group mb-3">
+                            <input type="text" id="tituloTarefa" placeholder="Título do chamado..." class="form-control" autofocus required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <textarea id="descricaoTarefa" placeholder="Descrição detalhada..." class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>👥 Profissionais designados:</label>
+                            <input type="text" id="profissionaisTarefa" placeholder="Ex: Gerente, AntónioTI..." class="form-control">
+                            <small class="text-muted">Separe os nomes por vírgula</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Data limite (opcional):</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M2 2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+                                            <path d="M2.5 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5z"/>
+                                        </svg>
+                                    </span>
+                                </div>
+                                <input type="date" id="dataLimite" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Categoria:</label>
+                            <div class="d-flex gap-2">
+                                <select id="categoriaSelect" class="form-control" required>
+                                    {% for categoria in categorias %}
+                                        <option value="{{ categoria.id }}" {% if loop.first %}selected{% endif %}>
+                                            {{ categoria.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" id="btnAbrirCategoria" class="btn-nova-categoria">+ Nova</button>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Prioridade:</label>
+                            <div class="d-flex gap-3">
+                                <label class="btn-prioridade">
+                                    <input type="radio" name="prioridade" value="Baixa" class="btn-check">
+                                    <span class="btn btn-outline-success btn-sm">Baixa</span>
+                                </label>
+                                <label class="btn-prioridade">
+                                    <input type="radio" name="prioridade" value="Media" class="btn-check" checked>
+                                    <span class="btn btn-outline-warning btn-sm">Média</span>
+                                </label>
+                                <label class="btn-prioridade">
+                                    <input type="radio" name="prioridade" value="Alta" class="btn-check">
+                                    <span class="btn btn-outline-danger btn-sm">Alta</span>
+                                </label>
+                                <label class="btn-prioridade">
+                                    <input type="radio" name="prioridade" value="Urgente" class="btn-check">
+                                    <span class="btn btn-outline-danger btn-sm">Urgente</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Status:</label>
+                            <select id="statusSelect" class="form-control">
+                                <option value="Aberto">📋 Aberto</option>
+                                <option value="Em andamento">⚙️ Em andamento</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Guardar Chamado</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUNA DIREITA: Lista de categorias -->
+        <div class="col-right">
+            <div class="card">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Categorias</h4>
+                    <div class="d-flex gap-2">
+                        <button id="btnPesquisar" class="btn-pesquisar">Pesquisar</button>
+                        <button id="btnNovaCategoriaTopo" class="btn-pesquisar">+ Nova</button>
+                    </div>
+                </div>
+                <div class="card-body" id="categoriasContainer">
+                    <div id="listaCategorias"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- MODAIS -->
+<!-- Pop-up de ação (cancelar/excluir) -->
+<div id="customModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header-custom">
+            <div class="modal-icon">🗑️</div>
+            <h3 class="modal-title">Ação do Chamado</h3>
+        </div>
+        <div class="modal-body-custom">
+            <p>O que deseja fazer com este chamado?</p>
+            <p id="modalTaskName" class="task-name"></p>
+        </div>
+        <div class="modal-footer-custom" style="flex-wrap: wrap; gap: 0.5rem;">
+            <button id="modalCancelarBtn" class="btn-cancelar" style="background: #ffc107; color: #000;">🚫 Cancelar Chamado</button>
+            <button id="modalConfirmBtn" class="btn-eliminar-custom">🗑️ Excluir Permanentemente</button>
+            <button id="modalCloseBtn" class="btn-cancelar">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Pop-up de eliminação (categoria) -->
+<div id="categoriaDeleteModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header-custom">
+            <div class="modal-icon">
+                <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1z"/>
+                </svg>
+            </div>
+            <h3 class="modal-title">Eliminar Categoria</h3>
+        </div>
+        <div class="modal-body-custom">
+            <p>Tem certeza que deseja eliminar esta categoria?</p>
+            <p id="categoriaDeleteName" class="task-name"></p>
+            <small>Os chamados desta categoria serão removidos.</small>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="categoriaDeleteCancelBtn" class="btn-cancelar">Cancelar</button>
+            <button id="categoriaDeleteConfirmBtn" class="btn-eliminar-custom">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Pop-up de pesquisa com filtros -->
+<div id="searchModal" class="modal-overlay">
+    <div class="modal-container search-modal">
+        <div class="modal-header-custom">
+            <div class="modal-icon">
+                <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1z"/>
+                </svg>
+            </div>
+            <h3 class="modal-title">Pesquisar e Filtrar Chamados</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div class="form-group mb-3">
+                <input type="text" id="searchInput" placeholder="Digite palavras-chave..." class="form-control search-input" autofocus>
+            </div>
+            <div class="filtros-container">
+                <div class="filtros-row">
+                    <div class="filtro-group">
+                        <label>Status:</label>
+                        <select id="filtroStatus" class="form-control">
+                            <option value="todos">Todos</option>
+                            <option value="nao_concluidos">Não concluídos</option>
+                            <option value="concluidos">Finalizados</option>
+                            <option value="Aberto">📋 Aberto</option>
+                            <option value="Em andamento">⚙️ Em andamento</option>
+                            <option value="Concluido">✅ Concluído</option>
+                            <option value="Cancelado">❌ Cancelado</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group">
+                        <label>Prioridade:</label>
+                        <select id="filtroPrioridade" class="form-control">
+                            <option value="todas">Todas</option>
+                            <option value="Baixa">Baixa</option>
+                            <option value="Media">Média</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Urgente">Urgente</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group">
+                        <label>Categoria:</label>
+                        <select id="filtroCategoria" class="form-control">
+                            <option value="todas">Todas</option>
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
+                            {% endfor %}
+                            <option value="sem_categoria">Sem categoria</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filtro-acoes">
+                    <button id="btnAplicarFiltros" class="btn-filtro">Aplicar filtros</button>
+                    <button id="btnLimparFiltros" class="btn-filtro">Limpar filtros</button>
+                </div>
+            </div>
+            <div id="searchResults" class="search-results-container">
+                <div class="sem-resultados">Utilize os filtros ou a busca acima para encontrar chamados.</div>
+            </div>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="searchCloseBtn" class="btn-cancelar">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Pop-up de criação/edição de categoria -->
+<div id="categoriaModal" class="modal-overlay">
+    <div class="modal-container categoria-modal">
+        <div class="modal-header-custom">
+            <div class="modal-icon">
+                <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+            </div>
+            <h3 class="modal-title" id="categoriaModalTitle">Criar Nova Categoria</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div class="form-group mb-3">
+                <label>Nome da categoria</label>
+                <input type="text" id="categoriaNome" placeholder="Ex: Infraestrutura, Software, Rede..." class="form-control" autofocus>
+            </div>
+            <div class="row">
+                <div class="col-6">
+                    <label>Cor</label>
+                    <div class="seletor-wrapper">
+                        <button type="button" id="btnCor" class="seletor-botao">
+                            <span id="corPreview" class="cor-preview" style="background-color: #ff6b6b;"></span>
+                            <span id="corTexto">Vermelho</span>
+                            <svg class="seletor-seta" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+                            </svg>
+                        </button>
+                        <div id="menuCor" class="seletor-menu">
+                            <div class="seletor-opcao" data-cor="#ff6b6b" data-nome="Vermelho"><span class="cor-bolinha" style="background:#ff6b6b"></span> Vermelho</div>
+                            <div class="seletor-opcao" data-cor="#4ecdc4" data-nome="Turquesa"><span class="cor-bolinha" style="background:#4ecdc4"></span> Turquesa</div>
+                            <div class="seletor-opcao" data-cor="#45b7d1" data-nome="Azul"><span class="cor-bolinha" style="background:#45b7d1"></span> Azul</div>
+                            <div class="seletor-opcao" data-cor="#96ceb4" data-nome="Verde"><span class="cor-bolinha" style="background:#96ceb4"></span> Verde</div>
+                            <div class="seletor-opcao" data-cor="#ffeaa7" data-nome="Amarelo"><span class="cor-bolinha" style="background:#ffeaa7"></span> Amarelo</div>
+                            <div class="seletor-opcao" data-cor="#a29bfe" data-nome="Roxo"><span class="cor-bolinha" style="background:#a29bfe"></span> Roxo</div>
+                            <div class="seletor-opcao" data-cor="#fd79a8" data-nome="Rosa"><span class="cor-bolinha" style="background:#fd79a8"></span> Rosa</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label>Ícone</label>
+                    <div class="seletor-wrapper">
+                        <button type="button" id="btnIcone" class="seletor-botao">
+                            <span id="iconePreview" class="icone-preview">
+                                <svg width="16" height="16" fill="currentColor" class="bi bi-pc-display" viewBox="0 0 16 16">
+                                    <path d="M8 1a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1zm1 13.5a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0m2 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0M9.5 1a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM9 3.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 0-1h-5a.5.5 0 0 0-.5.5M1.5 2A1.5 1.5 0 0 0 0 3.5v7A1.5 1.5 0 0 0 1.5 12H6v2h-.5a.5.5 0 0 0 0 1H7v-4H1.5a.5.5 0 0 1-.5-.5v-7a.5.5 0 0 1 .5-.5H7V2z"/>
+                                </svg>
+                            </span>
+                            <span id="iconeTexto">Infraestrutura</span>
+                            <svg class="seletor-seta" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+                            </svg>
+                        </button>
+                        <div id="menuIcone" class="seletor-menu icone-menu">
+                            <div class="seletor-opcao" data-icone="infraestrutura" data-nome="Infraestrutura">
+                                <svg width="16" height="16" fill="currentColor" class="bi bi-pc-display" viewBox="0 0 16 16">
+                                    <path d="M8 1a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1zm1 13.5a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0m2 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0M9.5 1a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM9 3.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 0-1h-5a.5.5 0 0 0-.5.5M1.5 2A1.5 1.5 0 0 0 0 3.5v7A1.5 1.5 0 0 0 1.5 12H6v2h-.5a.5.5 0 0 0 0 1H7v-4H1.5a.5.5 0 0 1-.5-.5v-7a.5.5 0 0 1 .5-.5H7V2z"/>
+                                </svg>
+                                Infraestrutura
+                            </div>
+                            <div class="seletor-opcao" data-icone="software" data-nome="Software">
+                                <svg width="16" height="16" fill="currentColor" class="bi bi-braces" viewBox="0 0 16 16">
+                                    <path d="M2.114 8.063V7.9c1.005-.102 1.497-.615 1.497-1.6V4.503c0-1.094.39-1.538 1.354-1.538h.273V2h-.376C3.25 2 2.49 2.759 2.49 4.352v1.524c0 1.094-.376 1.456-1.49 1.456v1.299c1.114 0 1.49.362 1.49 1.456v1.524c0 1.593.759 2.352 2.372 2.352h.376v-.964h-.273c-.964 0-1.354-.444-1.354-1.538V9.663c0-.984-.492-1.497-1.497-1.6M13.886 7.9v.163c-1.005.103-1.497.616-1.497 1.6v1.798c0 1.094-.39 1.538-1.354 1.538h-.273v.964h.376c1.613 0 2.372-.759 2.372-2.352v-1.524c0-1.094.376-1.456 1.49-1.456V7.332c-1.114 0-1.49-.362-1.49-1.456V4.352C13.51 2.759 12.75 2 11.138 2h-.376v.964h.273c.964 0 1.354.444 1.354 1.538V6.3c0 .984.492 1.497 1.497 1.6"/>
+                                </svg>
+                                Software
+                            </div>
+                            <div class="seletor-opcao" data-icone="rede" data-nome="Rede">
+                                <svg width="16" height="16" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16">
+                                    <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.44 12.44 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.52.52 0 0 0 .668.05A11.45 11.45 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049"/>
+                                    <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z"/>
+                                </svg>
+                                Rede
+                            </div>
+                            <div class="seletor-opcao" data-icone="hardware" data-nome="Hardware">
+                                <svg width="16" height="16" fill="currentColor" class="bi bi-pci-card" viewBox="0 0 16 16">
+                                    <path d="M0 1.5A.5.5 0 0 1 .5 1h1a.5.5 0 0 1 .5.5V4h13.5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5H2v2.5a.5.5 0 0 1-1 0V2H.5a.5.5 0 0 1-.5-.5"/>
+                                    <path d="M3 12.5h3.5v1a.5.5 0 0 1-.5.5H3.5a.5.5 0 0 1-.5-.5zm4 0h4v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5z"/>
+                                </svg>
+                                Hardware
+                            </div>
+                            <div class="seletor-opcao" data-icone="seguranca" data-nome="Segurança">
+                                <svg width="16" height="16" fill="currentColor" class="bi bi-database-fill-lock" viewBox="0 0 16 16">
+                                    <path d="M8 1c-1.573 0-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4s.875 1.755 1.904 2.223C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777C13.125 5.755 14 5.007 14 4s-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1"/>
+                                    <path d="M3.904 9.223C2.875 8.755 2 8.007 2 7v-.839c.457.432 1.004.751 1.49.972C4.722 7.693 6.318 8 8 8s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V7c0 .424-.155.802-.411 1.133a4.5 4.5 0 0 0-1.364-.125 3 3 0 0 0-2.197.731 4.5 4.5 0 0 0-1.254 1.237A12 12 0 0 1 8 10c-1.573 0-3.022-.289-4.096-.777M8 14c-1.682 0-3.278-.307-4.51-.867-.486-.22-1.033-.54-1.49-.972V13c0 1.007.875 1.755 1.904 2.223C4.978 15.711 6.427 16 8 16q.134 0 .266-.003A2 2 0 0 1 8 15zm0-1.5q0 .15.01.3A2 2 0 0 0 8 13c-1.573 0-3.022-.289-4.096-.777C2.875 11.755 2 11.007 2 10v-.839c.457.432 1.004.751 1.49.972C4.722 10.693 6.318 11 8 11q.13 0 .257-.002A4.5 4.5 0 0 0 8 12.5"/>
+                                    <path d="M9 13a1 1 0 0 1 1-1v-1a2 2 0 1 1 4 0v1a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1zm3-3a1 1 0 0 0-1 1v1h2v-1a1 1 0 0 0-1-1"/>
+                                </svg>
+                                Segurança
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-categoria mt-3">
+                <small>Preview:</small>
+                <div id="previewBox" class="preview-box" style="background-color: #ff6b6b;">
+                    <svg width="16" height="16" fill="white" class="bi bi-pc-display" viewBox="0 0 16 16">
+                        <path d="M8 1a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1zm1 13.5a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0m2 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0M9.5 1a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM9 3.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 0-1h-5a.5.5 0 0 0-.5.5M1.5 2A1.5 1.5 0 0 0 0 3.5v7A1.5 1.5 0 0 0 1.5 12H6v2h-.5a.5.5 0 0 0 0 1H7v-4H1.5a.5.5 0 0 1-.5-.5v-7a.5.5 0 0 1 .5-.5H7V2z"/>
+                    </svg>
+                    Nome
+                </div>
+            </div>
+            <input type="hidden" id="categoriaEditId" value="">
+        </div>
+        <div class="modal-footer-custom">
+            <button id="categoriaCancelBtn" class="btn-cancelar">Cancelar</button>
+            <button id="categoriaSaveBtn" class="btn-eliminar-custom">Criar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Visualização/Edição de Descrição -->
+<div id="descricaoModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header-custom">
+            <div class="modal-icon">📝</div>
+            <h3 class="modal-title" id="descricaoModalTitulo">Detalhes do Chamado</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div class="form-group mb-3">
+                <label>Descrição detalhada:</label>
+                <textarea id="descricaoModalTexto" class="form-control" rows="5" placeholder="Adicione uma descrição detalhada..."></textarea>
+            </div>
+            <div class="info-chamado">
+                <p id="descricaoModalDataCriacao"></p>
+                <p id="descricaoModalStatus"></p>
+                <p id="descricaoModalPrioridade"></p>
+                <p id="descricaoModalDataLimite"></p>
+            </div>
+        </div>
+        <div class="modal-footer-custom">
+            <button onclick="fecharDescricaoModal()" class="btn-cancelar">Fechar</button>
+            <button onclick="salvarDescricao()" class="btn-eliminar-custom">💾 Guardar Descrição</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalhes do Chamado (OS, Profissionais + Comentários) -->
+<div id="detalhesModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header-custom">
+            <div class="modal-icon">ℹ️</div>
+            <h3 class="modal-title" id="detalhesModalTitulo">Detalhes do Chamado</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div class="info-chamado">
+                <p><strong>📝 Descrição:</strong></p>
+                <p id="detalhesDescricao" class="descricao-texto"></p>
+                <hr>
+                <p><strong>🆓 Número OS:</strong> <span id="detalhesOS">---</span></p>
+                <p><strong>👥 Profissionais designados:</strong></p>
+                <input type="text" id="detalhesProfissionaisInput" class="form-control" placeholder="Nomes separados por vírgula">
+                <p><strong>📅 Data de criação:</strong> <span id="detalhesDataCriacao"></span></p>
+                <p><strong>📋 Status:</strong> <span id="detalhesStatus"></span></p>
+                <p><strong>🎯 Prioridade:</strong> <span id="detalhesPrioridade"></span></p>
+            </div>
+            <hr>
+            <!-- Seção de comentários -->
+            <div id="detalhesComentarios" class="comentarios-container" style="max-height: 300px; overflow-y: auto;"></div>
+            <div class="border-top pt-3 mt-3">
+                <div class="form-group mb-2">
+                    <textarea id="novoComentarioTexto" class="form-control" rows="2" placeholder="Adicionar um comentário..."></textarea>
+                </div>
+                <button id="btnAdicionarComentario" class="btn btn-primary btn-block">💬 Comentar</button>
+            </div>
+        </div>
+        <div class="modal-footer-custom">
+            <button onclick="fecharDetalhesModal()" class="btn-cancelar">Fechar</button>
+            <button onclick="salvarProfissionais()" class="btn-eliminar-custom">💾 Guardar Profissionais</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de código de acesso (opcional, antes do login) -->
+<div id="codigoModal" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 400px;">
+        <div class="modal-header-custom">
+            <div class="modal-icon">🔒</div>
+            <h3 class="modal-title">Acesso Restrito</h3>
+        </div>
+        <div class="modal-body-custom">
+            <p>Este grupo é protegido por código de acesso.</p>
+            <div class="form-group mb-3">
+                <input type="password" id="codigoAcessoInput" class="form-control" placeholder="Digite o código..." autofocus>
+            </div>
+            <p id="codigoErro" style="color: #e44c55; display: none;">Código incorreto. Tente novamente.</p>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="codigoEntrarBtn" class="btn-eliminar-custom">Entrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de login de membro -->
+<div id="loginMembroModal" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 400px;">
+        <div class="modal-header-custom">
+            <div class="modal-icon">🔑</div>
+            <h3 class="modal-title">Identificação</h3>
+        </div>
+        <div class="modal-body-custom">
+            <p>Escolha o seu nome e insira a sua senha.</p>
+            <div class="form-group mb-3">
+                <label>Membro</label>
+                <select id="membroSelect" class="form-control"></select>
+            </div>
+            <div class="form-group mb-3">
+                <label>Senha</label>
+                <input type="password" id="membroSenhaInput" class="form-control" placeholder="Senha">
+            </div>
+            <p id="loginMembroErro" style="color: #e44c55; display: none;">Credenciais inválidas.</p>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="loginMembroConfirm" class="btn-eliminar-custom">Entrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de gestão de membros (admin) -->
+<div id="adminPanelModal" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header-custom">
+            <div class="modal-icon">👥</div>
+            <h3 class="modal-title">Gerir Membros</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div id="listaMembros" class="mb-3"></div>
+            <div class="border-top pt-3">
+                <div class="form-group mb-2">
+                    <input type="text" id="novoMembroNome" class="form-control" placeholder="Nome do novo membro">
+                </div>
+                <div class="form-group mb-3">
+                    <input type="text" id="novoMembroSenha" class="form-control" placeholder="Senha do novo membro">
+                </div>
+                <button id="btnAdicionarMembro" class="btn btn-primary btn-block">Adicionar Membro</button>
+                <p id="erroMembro" style="color: #e44c55; display: none;"></p>
+            </div>
+        </div>
+        <div class="modal-footer-custom">
+            <button id="fecharAdminPanel" class="btn-cancelar">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- INJEÇÃO DE DADOS DO SERVIDOR -->
+<script>
+    window.categoriasData = {{ categorias|tojson }};
+    window.tarefasPorCategoria = {{ tarefas_por_categoria|tojson }};
+    window.tarefasSemCategoria = {{ tarefas_sem_categoria|tojson }};
+    window.grupoSlug = "{{ grupo.slug }}";
+    window.codigoCorreto = "{{ codigo_correto or '' }}";
+    window.grupoTemMembros = {{ 'true' if grupo.membros|length > 0 else 'false' }};
+    window.membroLogado = {{ 'true' if membro_logado else 'false' }};
+    window.membroNome = "{{ membro_nome or '' }}";
+    window.membroIsGerente = {{ 'true' if membro_is_gerente else 'false' }};
+</script>
+
+<!-- Controlo de acesso com código (opcional, antes de tudo) -->
+<script>
+    (function() {
+        const codigoCorreto = window.codigoCorreto;
+        const slug = window.grupoSlug;
+
+        if (!codigoCorreto || localStorage.getItem('codigo_' + slug) === codigoCorreto) {
+            return;
+        }
+
+        const modal = document.getElementById('codigoModal');
+        const input = document.getElementById('codigoAcessoInput');
+        const btnEntrar = document.getElementById('codigoEntrarBtn');
+        const msgErro = document.getElementById('codigoErro');
+
+        modal.style.display = 'flex';
+        input.focus();
+
+        function verificar() {
+            const valor = input.value.trim();
+            if (valor === codigoCorreto) {
+                localStorage.setItem('codigo_' + slug, codigoCorreto);
+                modal.style.display = 'none';
+                location.reload();
+            } else {
+                msgErro.style.display = 'block';
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        btnEntrar.addEventListener('click', verificar);
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                verificar();
+            }
+        });
+    })();
+</script>
+
+<!-- Lógica de login de membro (se necessário) -->
+<script>
+    if (window.grupoTemMembros && !window.membroLogado) {
+        const loginModal = document.getElementById('loginMembroModal');
+        loginModal.style.display = 'flex';
+
+        fetch(`/grupo/${window.grupoSlug}/membros`, {
+            headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+        })
+        .then(r => r.json())
+        .then(membros => {
+            const select = document.getElementById('membroSelect');
+            select.innerHTML = membros.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
+        })
+        .catch(() => {
+            document.getElementById('loginMembroErro').textContent = 'Erro ao carregar membros.';
+            document.getElementById('loginMembroErro').style.display = 'block';
+        });
+
+        document.getElementById('loginMembroConfirm').addEventListener('click', () => {
+            const membroId = document.getElementById('membroSelect').value;
+            const senha = document.getElementById('membroSenhaInput').value;
+            fetch(`/grupo/${window.grupoSlug}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ membro_id: membroId, senha })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    document.getElementById('loginMembroErro').style.display = 'block';
+                }
+            });
+        });
+    }
+
+    // Exibir nome do membro logado e botões
+    if (window.membroLogado) {
+        const nomeEl = document.getElementById('nomeMembroLogado');
+        if (nomeEl) nomeEl.textContent = '👤 ' + window.membroNome;
+        const btnLogout = document.getElementById('btnLogout');
+        if (btnLogout) btnLogout.style.display = 'inline-flex';
+        if (window.membroIsGerente) {
+            const btnAdmin = document.getElementById('btnAdmin');
+            if (btnAdmin) btnAdmin.style.display = 'inline-flex';
+        }
+    }
+</script>
+
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

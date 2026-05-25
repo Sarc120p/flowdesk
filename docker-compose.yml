@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./database:/app/database   # persiste a base de dados fora do container
+    environment:
+      - SECRET_KEY=uma-chave-secreta-muito-segura
